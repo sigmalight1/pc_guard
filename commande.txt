@@ -1,0 +1,69 @@
+تثبيت PyInstaller
+كيقوم بتثبيت الأداة اللي غادي نحولو بها Python إلى .exe:
+
+pip install pyinstaller
+=======================================
+تثبيت PyInstaller بالطريقة المضمونة
+
+كيستعمل نفس Python اللي عندك باش يثبت PyInstaller:
+
+python -m pip install pyinstaller
+=========================================
+
+التأكد أن PyInstaller تثبت بنجاح
+
+python -m PyInstaller --version
+
+==========================================
+تحويل PC GUARD إلى تطبيق Windows
+
+python -m PyInstaller --onefile --windowed --icon="pc_guard.ico" --name "PC_GUARD" pc_guard.py
+
+===========================================
+#define MyAppName "PC GUARD"
+#define MyAppVersion "1.0"
+#define MyAppPublisher "PC GUARD"
+#define MyAppExeName "PC_GUARD.exe"
+
+[Setup]
+AppId={{PC-GUARD-APP}}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+
+DefaultDirName={localappdata}\PCGuard
+DefaultGroupName={#MyAppName}
+
+DisableProgramGroupPage=yes
+
+OutputDir=installer
+OutputBaseFilename=PC_GUARD_Setup
+
+Compression=lzma
+SolidCompression=yes
+
+PrivilegesRequired=lowest
+
+Uninstallable=yes
+
+
+[Files]
+
+Source: "C:\Users\USER\Desktop\pc_guard\dist\PC_GUARD.exe"; \
+    DestDir: "{app}"; \
+    Flags: ignoreversion
+
+
+[Icons]
+
+Name: "{userdesktop}\PC GUARD"; \
+    Filename: "{app}\PC_GUARD.exe"; \
+    WorkingDir: "{app}"; \
+    IconFilename: "{app}\PC_GUARD.exe"
+
+
+[Run]
+
+Filename: "{app}\PC_GUARD.exe"; \
+    Description: "Launch PC GUARD"; \
+    Flags: nowait postinstall skipifsilent
