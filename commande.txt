@@ -17,7 +17,7 @@ python -m PyInstaller --version
 ==========================================
 تحويل PC GUARD إلى تطبيق Windows
 
-python -m PyInstaller --onefile --windowed --icon="pc_guard.ico" --name "PC_GUARD" pc_guard.py
+python -m PyInstaller --onedir --windowed --icon="pc_guard.ico" --name "PC_GUARD" pc_guard.py
 
 ===========================================
 #define MyAppName "PC GUARD"
@@ -43,16 +43,13 @@ Compression=lzma
 SolidCompression=yes
 
 PrivilegesRequired=lowest
-
 Uninstallable=yes
-
 
 [Files]
 
-Source: "C:\Users\USER\Desktop\pc_guard\dist\PC_GUARD.exe"; \
+Source: "C:\Users\USER\Desktop\pc_guard\dist\PC_GUARD\*"; \
     DestDir: "{app}"; \
-    Flags: ignoreversion
-
+    Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 
@@ -60,7 +57,6 @@ Name: "{userdesktop}\PC GUARD"; \
     Filename: "{app}\PC_GUARD.exe"; \
     WorkingDir: "{app}"; \
     IconFilename: "{app}\PC_GUARD.exe"
-
 
 [Run]
 
