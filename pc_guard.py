@@ -1304,18 +1304,29 @@ class PCGuard:
             return False
 
     # --------------------------------------------------------
-    # BLOCK FILE
+    # ITEM TYPE  (العناصر القديمة بدون type = file)
+    # --------------------------------------------------------
+
+    def get_item_type(self, item):
+
+        return "folder" if item.get("type") == "folder" else "file"
+
+    # --------------------------------------------------------
+    # BLOCK FILE / FOLDER
     # --------------------------------------------------------
 
     def block_file(
         self,
-        file_path
+        file_path,
+        is_folder=False
     ):
 
-        if not os.path.exists(
+        if is_folder:
+            if not os.path.isdir(file_path):
+                return False, "Folder does not exist."
+        elif not os.path.exists(
             file_path
         ):
-
             return False, "File does not exist."
 
         try:
@@ -1326,11 +1337,19 @@ class PCGuard:
 
                 return False, "Windows username not found."
 
+            # (OI)(CI) = الحماية تنطبق على كل الملفات والمجلدات
+            # الموجودة، وتورَّث تلقائياً لأي عنصر جديد داخل الـFolder
+            permission = (
+                f"{username}:(OI)(CI)(R)"
+                if is_folder
+                else f"{username}:(R)"
+            )
+
             command = [
                 "icacls",
                 file_path,
                 "/deny",
-                f"{username}:(R)"
+                permission
             ]
 
             result = subprocess.run(
@@ -1354,18 +1373,21 @@ class PCGuard:
             return False, str(e)
 
     # --------------------------------------------------------
-    # UNBLOCK FILE
+    # UNBLOCK FILE / FOLDER
     # --------------------------------------------------------
 
     def unblock_file(
         self,
-        file_path
+        file_path,
+        is_folder=False
     ):
 
-        if not os.path.exists(
+        if is_folder:
+            if not os.path.isdir(file_path):
+                return False, "Folder does not exist."
+        elif not os.path.exists(
             file_path
         ):
-
             return False, "File does not exist."
 
         try:
@@ -1376,6 +1398,9 @@ class PCGuard:
 
                 return False, "Windows username not found."
 
+            # بدون /T عمداً: الـFolder محجوب القراءة أثناء الحماية،
+            # فلا يمكن لـicacls تعداد محتوياته. إزالة الـDeny من الـFolder
+            # نفسه تنتشر تلقائياً من Windows إلى كل المحتويات الموروثة.
             command = [
                 "icacls",
                 file_path,
@@ -1458,6 +1483,84 @@ class PCGuard:
             )
 
     # --------------------------------------------------------
+    # ADD FOLDER
+    # --------------------------------------------------------
+
+    def add_protected_folder(
+        self,
+        refresh_callback
+    ):
+
+        selected = filedialog.askdirectory(
+            parent=self.root,
+            title="Select folder to protect"
+        )
+
+        if not selected:
+            return
+
+        path = os.path.abspath(selected)
+
+        # حماية للتطبيق: ممنوع حماية مجلد بيانات التطبيق أو أي مجلد يحتويه،
+        # لأنه سيمنع التطبيق من قراءة config.json و protected_files.json
+        app_dir = os.path.normcase(
+            os.path.abspath(self.APP_DATA_DIR)
+        )
+
+        chosen = os.path.normcase(path)
+
+        if (
+            app_dir == chosen
+            or app_dir.startswith(
+                chosen.rstrip(os.sep) + os.sep
+            )
+        ):
+
+            messagebox.showerror(
+                "FILE PROTECTION",
+                (
+                    "This folder contains PC GUARD data "
+                    "and cannot be protected."
+                ),
+                parent=self.root
+            )
+
+            return
+
+        files = self.load_protected_files()
+
+        if path in {
+            item.get("path")
+            for item in files
+        }:
+
+            messagebox.showinfo(
+                "FILE PROTECTION",
+                "This folder is already in the list.",
+                parent=self.root
+            )
+
+            return
+
+        files.append({
+            "path": path,
+            "active": False,
+            "type": "folder"
+        })
+
+        if self.save_protected_files(
+            files
+        ):
+
+            refresh_callback()
+
+            messagebox.showinfo(
+                "FILE PROTECTION",
+                "1 folder added.",
+                parent=self.root
+            )
+
+    # --------------------------------------------------------
     # REMOVE FILES
     # --------------------------------------------------------
 
@@ -1492,7 +1595,8 @@ class PCGuard:
                 if item.get("active"):
 
                     success, error = self.unblock_file(
-                        path
+                        path,
+                        self.get_item_type(item) == "folder"
                     )
 
                     if not success:
@@ -1560,7 +1664,8 @@ class PCGuard:
                 continue
 
             success, error = self.block_file(
-                path
+                path,
+                self.get_item_type(item) == "folder"
             )
 
             if success:
@@ -1634,7 +1739,8 @@ class PCGuard:
                 continue
 
             success, error = self.unblock_file(
-                path
+                path,
+                self.get_item_type(item) == "folder"
             )
 
             if success:
@@ -1739,6 +1845,29 @@ class PCGuard:
             cursor="hand2"
         ).pack(
             side="left",
+            ipadx=15,
+            ipady=7
+        )
+
+        tk.Button(
+            top,
+            text="+  ADD FOLDER",
+            command=lambda: self.add_protected_folder(
+                refresh
+            ),
+            bg=self.BLUE,
+            fg=self.BG,
+            activebackground="#79b8ff",
+            relief="flat",
+            font=(
+                "Segoe UI",
+                10,
+                "bold"
+            ),
+            cursor="hand2"
+        ).pack(
+            side="left",
+            padx=(8, 0),
             ipadx=15,
             ipady=7
         )
@@ -1906,7 +2035,7 @@ class PCGuard:
                     files_frame,
                     text=(
                         "No files selected yet.\n\n"
-                        "Click ADD FILES to choose files."
+                        "Click ADD FILES or ADD FOLDER to choose items."
                     ),
                     font=(
                         "Segoe UI",
@@ -1927,6 +2056,10 @@ class PCGuard:
                 active = item.get(
                     "active",
                     False
+                )
+
+                is_folder = (
+                    self.get_item_type(item) == "folder"
                 )
 
                 var = tk.BooleanVar(
@@ -1963,6 +2096,22 @@ class PCGuard:
                     padx=(10, 5)
                 )
 
+                tk.Label(
+                    row,
+                    text="FOLDER" if is_folder else "FILE",
+                    font=(
+                        "Segoe UI",
+                        8,
+                        "bold"
+                    ),
+                    fg=self.BLUE if is_folder else self.MUTED,
+                    bg="#161b22",
+                    width=8
+                ).pack(
+                    side="left",
+                    padx=(0, 5)
+                )
+
                 info = tk.Frame(
                     row,
                     bg="#161b22"
@@ -1975,8 +2124,9 @@ class PCGuard:
                     pady=9
                 )
 
-                filename = os.path.basename(
-                    path
+                filename = (
+                    os.path.basename(path.rstrip("\\/"))
+                    or path
                 )
 
                 tk.Label(
@@ -2006,12 +2156,20 @@ class PCGuard:
                     anchor="w"
                 )
 
-                status_text = (
-                    "● ACTIVE — FILE PROTECTED"
-                    if active
-                    else
-                    "● INACTIVE — FILE ACCESS ALLOWED"
-                )
+                if is_folder:
+                    status_text = (
+                        "● ACTIVE — FOLDER PROTECTED"
+                        if active
+                        else
+                        "● INACTIVE — FOLDER ACCESS ALLOWED"
+                    )
+                else:
+                    status_text = (
+                        "● ACTIVE — FILE PROTECTED"
+                        if active
+                        else
+                        "● INACTIVE — FILE ACCESS ALLOWED"
+                    )
 
                 status_color = (
                     self.RED_LIGHT
